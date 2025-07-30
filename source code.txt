@@ -1,0 +1,237 @@
+// ultimate note taker.cpp
+//The most open source text editor
+#include "pch.h"
+#include <windows.h>
+#include <commdlg.h>
+#include <fstream>
+#include <string>
+
+#define ID_FILE_OPEN    32771
+#define ID_FILE_SAVE    32772
+#define IDM_EXIT        32773
+#define IDM_ABOUT       32774
+#define ID_EDIT_UNDO      40001
+#define ID_EDIT_CUT       40002
+#define ID_EDIT_COPY      40003
+#define ID_EDIT_PASTE     40004
+#define ID_EDIT_SELECTALL 40005
+
+HINSTANCE hInst;
+HWND hEdit;
+
+LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK AboutDlgProc(HWND, UINT, WPARAM, LPARAM);
+
+void OpenFileDialog(HWND hwnd);
+void SaveFileDialog(HWND hwnd);
+
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
+{
+    hInst = hInstance;
+
+    // Register window class
+    WNDCLASS wc = {};
+    wc.lpfnWndProc = WndProc;
+    wc.hInstance = hInstance;
+    wc.lpszClassName = L"SimpleTextEditor";
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+
+    RegisterClass(&wc);
+
+    // Create main window
+    HWND hwnd = CreateWindowEx(
+        0, wc.lpszClassName, L"Ultimate Note Taker",
+        WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, CW_USEDEFAULT, 800, 600,
+        NULL, NULL, hInstance, NULL);
+
+    if (!hwnd)
+        return 0;
+
+    ShowWindow(hwnd, nCmdShow);
+    UpdateWindow(hwnd);
+
+    // Message loop
+    MSG msg;
+    while (GetMessage(&msg, NULL, 0, 0) > 0)
+    {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+    return (int)msg.wParam;
+}
+
+void CreateMenus(HWND hwnd)
+{
+    HMENU hMenubar = CreateMenu();
+    HMENU hFileMenu = CreateMenu();
+    HMENU hEditMenu = CreateMenu();
+    HMENU hHelpMenu = CreateMenu();
+
+    AppendMenu(hFileMenu, MF_STRING, ID_FILE_OPEN, L"&Open...\tCtrl+O");
+    AppendMenu(hFileMenu, MF_STRING, ID_FILE_SAVE, L"&Save...\tCtrl+S");
+    AppendMenu(hFileMenu, MF_SEPARATOR, 0, NULL);
+    AppendMenu(hFileMenu, MF_STRING, IDM_EXIT, L"E&xit");
+
+    AppendMenu(hEditMenu, MF_STRING, ID_EDIT_UNDO, L"&Undo\tCtrl+Z");
+    AppendMenu(hEditMenu, MF_SEPARATOR, 0, NULL);
+    AppendMenu(hEditMenu, MF_STRING, ID_EDIT_CUT, L"Cu&t\tCtrl+X");
+    AppendMenu(hEditMenu, MF_STRING, ID_EDIT_COPY, L"&Copy\tCtrl+C");
+    AppendMenu(hEditMenu, MF_STRING, ID_EDIT_PASTE, L"&Paste\tCtrl+V");
+    AppendMenu(hEditMenu, MF_SEPARATOR, 0, NULL);
+    AppendMenu(hEditMenu, MF_STRING, ID_EDIT_SELECTALL, L"Select &All\tCtrl+A");
+
+    AppendMenu(hHelpMenu, MF_STRING, IDM_ABOUT, L"&About");
+
+    AppendMenu(hMenubar, MF_POPUP, (UINT_PTR)hFileMenu, L"&File");
+    AppendMenu(hMenubar, MF_POPUP, (UINT_PTR)hEditMenu, L"&Edit");
+    AppendMenu(hMenubar, MF_POPUP, (UINT_PTR)hHelpMenu, L"&Help");
+
+    SetMenu(hwnd, hMenubar);
+}
+
+LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    switch (msg)
+    {
+    case WM_CREATE:
+    {
+        // Create multiline edit control with vertical and horizontal scrollbars
+        hEdit = CreateWindowEx(
+            WS_EX_CLIENTEDGE, L"EDIT", L"",
+            WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL |
+            ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL,
+            0, 0, 0, 0,
+            hwnd, (HMENU)1, hInst, NULL);
+
+        CreateMenus(hwnd);
+    }
+    break;
+
+    case WM_SIZE:
+    {
+        // Resize edit control to fill the client area
+        RECT rcClient;
+        GetClientRect(hwnd, &rcClient);
+        SetWindowPos(hEdit, NULL, 0, 0, rcClient.right, rcClient.bottom, SWP_NOZORDER);
+    }
+    break;
+
+    case WM_COMMAND:
+        switch (LOWORD(wParam))
+        {
+        case ID_FILE_OPEN:
+            OpenFileDialog(hwnd);
+            break;
+        case ID_FILE_SAVE:
+            SaveFileDialog(hwnd);
+            break;
+        case IDM_EXIT:
+            PostQuitMessage(0);
+            break;
+        case IDM_ABOUT:
+            DialogBox(hInst, MAKEINTRESOURCE(100), hwnd, AboutDlgProc);
+            break;
+        case ID_EDIT_UNDO:
+            SendMessage(hEdit, EM_UNDO, 0, 0);
+            break;
+        case ID_EDIT_CUT:
+            SendMessage(hEdit, WM_CUT, 0, 0);
+            break;
+        case ID_EDIT_COPY:
+            SendMessage(hEdit, WM_COPY, 0, 0);
+            break;
+        case ID_EDIT_PASTE:
+            SendMessage(hEdit, WM_PASTE, 0, 0);
+            break;
+        case ID_EDIT_SELECTALL:
+            SendMessage(hEdit, EM_SETSEL, 0, -1);
+            break;
+        }
+        break;
+
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+
+    default:
+        return DefWindowProc(hwnd, msg, wParam, lParam);
+    }
+    return 0;
+}
+
+INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message)
+    {
+    case WM_INITDIALOG:
+        return (INT_PTR)TRUE;
+
+    case WM_COMMAND:
+        if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
+        {
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
+        break;
+    }
+    return (INT_PTR)FALSE;
+}
+
+void OpenFileDialog(HWND hwnd)
+{
+    OPENFILENAME ofn;
+    wchar_t szFile[260] = { 0 };
+
+    ZeroMemory(&ofn, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = hwnd;
+    ofn.lpstrFile = szFile;
+    ofn.nMaxFile = sizeof(szFile) / sizeof(wchar_t);
+    ofn.lpstrFilter = L"Text Files\0*.txt\0All Files\0*.*\0";
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
+
+    if (GetOpenFileName(&ofn) == TRUE)
+    {
+        std::wifstream file(szFile);
+        if (file.is_open())
+        {
+            std::wstring content((std::istreambuf_iterator<wchar_t>(file)),
+                std::istreambuf_iterator<wchar_t>());
+            SetWindowText(hEdit, content.c_str());
+            file.close();
+        }
+    }
+}
+
+void SaveFileDialog(HWND hwnd)
+{
+    OPENFILENAME ofn;
+    wchar_t szFile[260] = { 0 };
+
+    ZeroMemory(&ofn, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = hwnd;
+    ofn.lpstrFile = szFile;
+    ofn.nMaxFile = sizeof(szFile) / sizeof(wchar_t);
+    ofn.lpstrFilter = L"Text Files\0*.txt\0All Files\0*.*\0";
+    ofn.Flags = OFN_OVERWRITEPROMPT | OFN_HIDEREADONLY;
+
+    if (GetSaveFileName(&ofn) == TRUE)
+    {
+        int len = GetWindowTextLength(hEdit);
+        if (len > 0)
+        {
+            std::wstring text(len + 1, L'\0');
+            GetWindowText(hEdit, &text[0], len + 1);
+
+            std::wofstream file(szFile);
+            if (file.is_open())
+            {
+                file << text;
+                file.close();
+            }
+        }
+    }
+}
